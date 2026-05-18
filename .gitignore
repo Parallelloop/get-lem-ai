@@ -1,0 +1,4 @@
+node_modules/
+.lem-ai.json
+.lem-ai.log
+.DS_Store
