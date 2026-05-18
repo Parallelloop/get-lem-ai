@@ -9,7 +9,7 @@ function ask(rl, question) {
 
 async function setup() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  console.log(chalk.cyan('\n🔧  lem-ai Setup\n'));
+  console.log(chalk.cyan('\n🔧  get-lem-ai Setup\n'));
 
   const outputFile = await ask(rl, 'Output filename [Implementation.md]: ') || 'Implementation.md';
   const apiKey = await ask(rl, 'SDK API Key (from Lem settings): ');
@@ -21,7 +21,7 @@ async function setup() {
   });
 
   console.log(chalk.green('\n✅  Config saved to .lem-ai.json'));
-  console.log(chalk.yellow('👉  Now cd into a git repo and run: lem-ai install\n'));
+  console.log(chalk.yellow('👉  Now cd into a git repo and run: get-lem-ai install\n'));
 }
 
 module.exports = { setup };

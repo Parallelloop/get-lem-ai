@@ -1,7 +1,7 @@
 {
   "name": "get-lem-ai",
   "version": "1.0.0",
-  "description": "lem-ai — Automate Implementation.md generation from Jira tickets on branch creation",
+  "description": "get-lem-ai — Automate Implementation.md generation from Jira tickets on branch creation",
   "main": "src/index.js",
   "bin": {
     "get-lem-ai": "bin/cli.js"
@@ -14,10 +14,10 @@
     "git",
     "hook",
     "jira",
-    "lem-ai",
+    "get-lem-ai",
     "automation"
   ],
-  "author": "lem-ai",
+  "author": "get-lem-ai",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.15.1",

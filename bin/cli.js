@@ -7,8 +7,8 @@ const { install, uninstall } = require('../src/install');
 const { checkout } = require('../src/checkout');
 
 program
-  .name('lem-ai')
-  .description('lem-ai — generate Implementation.md on branch creation')
+  .name('get-lem-ai')
+  .description('get-lem-ai — generate Implementation.md on branch creation')
   .version('1.0.0');
 
 program.command('setup').description('Configure webhook URL').action(setup);

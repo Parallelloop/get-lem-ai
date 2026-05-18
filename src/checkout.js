@@ -15,7 +15,7 @@ async function checkout(branchName) {
   const config = loadConfig();
 
   if (!config) {
-    console.log(chalk.yellow('\n⚠️  Not configured. Run: lem-ai setup\n'));
+    console.log(chalk.yellow('\n⚠️  Not configured. Run: get-lem-ai setup\n'));
     return;
   }
 
@@ -23,9 +23,9 @@ async function checkout(branchName) {
   // PHASE 1: Main Process — Spawn Background Worker & Exit
   // ────────────────────────────────────────────────────────────
   if (!process.env.LEMAI_BG) {
-    console.log(chalk.cyan(`\n[lem-ai] 🚀 Branch detected: ${chalk.bold(branchName)}`));
-    console.log(chalk.gray(`[lem-ai] ⚡ Generating Implementation.md in background...`));
-    console.log(chalk.gray(`[lem-ai] 🏁 Git checkout will proceed instantly.\n`));
+    console.log(chalk.cyan(`\n[get-lem-ai] 🚀 Branch detected: ${chalk.bold(branchName)}`));
+    console.log(chalk.gray(`[get-lem-ai] ⚡ Generating Implementation.md in background...`));
+    console.log(chalk.gray(`[get-lem-ai] 🏁 Git checkout will proceed instantly.\n`));
 
     const gitRoot = findGitRoot(process.cwd()) || process.cwd();
     const logPath = path.join(gitRoot, '.lem-ai.log');

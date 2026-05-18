@@ -5,7 +5,7 @@ const chalk = require('chalk');
 const { findGitRoot, getConfigPath } = require('./config');
 
 const HOOK_SCRIPT = `#!/bin/sh
-# Injected by lem-ai
+# Injected by get-lem-ai
 # This hook captures all branch creation events (git branch, git checkout -b, git switch -c)
 if [ "$1" = "committed" ]; then
     while read -r old_rev new_rev ref_name; do
@@ -13,7 +13,7 @@ if [ "$1" = "committed" ]; then
         if [ "$old_rev" = "0000000000000000000000000000000000000000" ] && [ "\${ref_name#refs/heads/}" != "$ref_name" ] && [ "$new_rev" != "0000000000000000000000000000000000000000" ]; then
             BRANCH_NAME=\${ref_name#refs/heads/}
             # Run synchronously since we fixed the Node hang issue
-            lem-ai checkout "$BRANCH_NAME"
+            get-lem-ai checkout "$BRANCH_NAME"
         fi
     done
 fi
@@ -46,7 +46,7 @@ async function install() {
     if (fs.existsSync(p)) {
       const content = fs.readFileSync(p, 'utf-8');
       if (content.includes('git-jira-hook') || content.includes('getlem') || content.includes('lem')) {
-        if (h === 'reference-transaction' && content.includes('Injected by lem-ai')) {
+        if (h === 'reference-transaction' && (content.includes('Injected by lem-ai') || content.includes('Injected by get-lem-ai'))) {
           // This is current, skip
           continue;
         }
@@ -84,12 +84,12 @@ function uninstall() {
     const content = fs.readFileSync(hookPath, 'utf-8');
     if (content.includes('lem-ai') || content.includes('getlem') || content.includes('lem') || content.includes('git-jira-hook')) {
       fs.unlinkSync(hookPath);
-      console.log(chalk.green('\n✅  lem-ai Git Hook uninstalled successfully.\n'));
+      console.log(chalk.green('\n✅  get-lem-ai Git Hook uninstalled successfully.\n'));
     } else {
-      console.log(chalk.yellow('\n⚠️   Hook at this path was not created by lem-ai. Skipping.\n'));
+      console.log(chalk.yellow('\n⚠️   Hook at this path was not created by get-lem-ai. Skipping.\n'));
     }
   } else {
-    console.log(chalk.gray('\nℹ️   No lem-ai hook found to uninstall.\n'));
+    console.log(chalk.gray('\nℹ️   No get-lem-ai hook found to uninstall.\n'));
   }
 
   // Also remove the project-level config file if it exists
