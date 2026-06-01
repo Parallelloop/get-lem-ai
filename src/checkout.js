@@ -4,7 +4,7 @@ const path = require('path');
 const axios = require('axios');
 const chalk = require('chalk');
 const { spawn } = require('child_process');
-const { loadConfig, findGitRoot, WEBHOOK_URL } = require('./config');
+const { loadConfig, findGitRoot, WEBHOOK_URL, ensureGitignore } = require('./config');
 
 function extractTicketId(branchName) {
   const match = branchName.match(/([A-Z][A-Z0-9]+-\d+)/i);
@@ -27,17 +27,10 @@ async function checkout(branchName) {
     console.log(chalk.gray(`[get-lem-ai] ⚡ Generating Implementation.md in background...`));
     console.log(chalk.gray(`[get-lem-ai] 🏁 Git checkout will proceed instantly.\n`));
 
-    const gitRoot = findGitRoot(process.cwd()) || process.cwd();
-    const logPath = path.join(gitRoot, '.lem-ai.log');
-
-    // Open log file for background process
-    const out = fs.openSync(logPath, 'a');
-    const err = fs.openSync(logPath, 'a');
-
     // Spawn this same CLI command but with LEMAI_BG=true
     const child = spawn(process.argv[0], [process.argv[1], 'checkout', branchName], {
       detached: true,
-      stdio: ['ignore', out, err],
+      stdio: 'ignore',
       env: { ...process.env, LEMAI_BG: 'true' },
       cwd: process.cwd()
     });
@@ -49,14 +42,14 @@ async function checkout(branchName) {
   // ────────────────────────────────────────────────────────────
   // PHASE 2: Background Process — Do the heavy lifting
   // ────────────────────────────────────────────────────────────
+  ensureGitignore();
   const ticketId = extractTicketId(branchName);
   const startTime = new Date().toISOString();
 
   const gitRoot = findGitRoot(process.cwd()) || process.cwd();
-  const logPath = path.join(gitRoot, '.lem-ai.log');
 
   const log = (msg) => {
-    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+    // No-op: Do not write to log files
   };
 
   log(`Starting background sync for ${branchName}...`);

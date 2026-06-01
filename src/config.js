@@ -22,14 +22,31 @@ function loadConfig() {
   catch { return null; }
 }
 
+function ensureGitignore() {
+  const repoRoot = findGitRoot(process.cwd());
+  if (!repoRoot) return;
+  const gitignorePath = path.join(repoRoot, '.gitignore');
+  let content = '';
+  if (fs.existsSync(gitignorePath)) {
+    content = fs.readFileSync(gitignorePath, 'utf-8');
+  }
+  const lines = content.split(/\r?\n/);
+  const hasConfig = lines.some(line => line.trim() === '.lem-ai.json');
+  if (!hasConfig) {
+    const suffix = content.endsWith('\n') || content === '' ? '' : '\n';
+    fs.appendFileSync(gitignorePath, `${suffix}.lem-ai.json\n`, 'utf-8');
+  }
+}
+
 function saveConfig(data) {
   const configPath = getConfigPath();
   if (!configPath) {
     throw new Error('Not inside a git repository. Cannot save project-level config.');
   }
   fs.writeFileSync(configPath, JSON.stringify(data, null, 2), 'utf-8');
+  ensureGitignore();
 }
 
 const WEBHOOK_URL = 'https://api.getlem.ai/api/v1/webhooks/lem';
 
-module.exports = { loadConfig, saveConfig, getConfigPath, findGitRoot, WEBHOOK_URL };
+module.exports = { loadConfig, saveConfig, getConfigPath, findGitRoot, WEBHOOK_URL, ensureGitignore };

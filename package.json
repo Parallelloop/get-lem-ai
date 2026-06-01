@@ -1,6 +1,6 @@
 {
   "name": "get-lem-ai",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "get-lem-ai — Automate Implementation.md generation from Jira tickets on branch creation",
   "main": "src/index.js",
   "bin": {

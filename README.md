@@ -1,9 +1,9 @@
 # get-lem-ai 🚀
 
-> **Lem Ai (getlem.ai) Git-Jira Automation Hook**  
+> **Lem Ai ([getlem.ai](https://getlem.ai)) Git Hook for Automated Context & Implementation Synthesis**  
 > Automatically generate `Implementation.md` documentation from Jira tickets upon creating new local Git branches.
 
-`get-lem-ai` is a lightweight, stack-agnostic Git hook CLI tool designed to link your local development environment directly to the **Lem Ai (getlem.ai)** knowledge graph. By capturing branch creation transactions, it dynamically fetches issue details, outlines architectural expectations, and generates detailed implementation specifications without delaying your Git checkout flow.
+`get-lem-ai` is a lightweight, stack-agnostic Git hook CLI tool designed to link your local development environment directly to the **Lem Ai ([getlem.ai](https://getlem.ai))** knowledge graph. By capturing branch creation transactions, it dynamically fetches issue details, outlines architectural expectations, and generates detailed implementation specifications without delaying your Git checkout flow.
 
 ---
 
@@ -11,7 +11,7 @@
 
 * **Instantaneous Git Checkout:** Spawns a detached background node process so your terminal checkouts proceed instantly without waiting for API responses.
 * **Smart Jira-Key Resolution:** Employs robust pattern-matching regex to extract Jira IDs directly from branch naming conventions (e.g. `feature/PROJ-123-auth`).
-* **Automated Evidence Collection:** Communicates with the Lem Ai (getlem.ai) platform to automatically generate `Implementation.md` files in the root of your project.
+* **Automated Evidence Collection:** Communicates with the Lem Ai ([getlem.ai](https://getlem.ai)) platform to automatically generate `Implementation.md` files in the root of your project.
 * **SOC 2 & SOP Compliance Guardrail:** Standardizes developmental structure by aligning your branch intent with administrative Jira tickets.
 * **Easy Hook Management:** Single commands to install, configure, or cleanly uninstall hook integrations.
 
@@ -59,7 +59,7 @@ get-lem-ai install
 
 ```
 ┌─────────────────┐       ┌───────────────────────────┐       ┌─────────────────┐
-│  git checkout   │ ────> │  reference-transaction   │ ────> │   get-lem-ai    │
+│  git checkout   │ ────> │  reference-transaction    │ ────> │   get-lem-ai    │
 │  -b PROJ-123    │       │  hook intercepts event    │       │   background    │
 └─────────────────┘       └───────────────────────────┘       └────────┬────────┘
                                                                        │
@@ -73,7 +73,7 @@ get-lem-ai install
 1. **Transaction Capture:** The reference-transaction hook triggers whenever local branches are created (using `git branch`, `git checkout -b`, or `git switch -c`).
 2. **Jira Key Extraction:** The tool parses the branch string searching for active Jira keys (e.g. `SOP-42`, `PROJ-999`).
 3. **Decoupled Request:** A detached background worker is spawned with `LEMAI_BG=true` redirecting outputs to `.lem-ai.log`. The parent process exits immediately to prevent terminal blocking.
-4. **Document Generation:** The worker sends the context payload to the Lem Ai (getlem.ai) engine which analyzes the corresponding ticket parameters, synthesizes architectural directions, and compiles a comprehensive `Implementation.md` locally.
+4. **Document Generation:** The worker sends the context payload to the Lem Ai ([getlem.ai](https://getlem.ai)) engine which analyzes the corresponding ticket parameters, synthesizes architectural directions, and compiles a comprehensive `Implementation.md` locally.
 
 ---
 

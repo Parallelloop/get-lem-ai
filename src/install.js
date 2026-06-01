@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
-const { findGitRoot, getConfigPath } = require('./config');
+const { findGitRoot, getConfigPath, ensureGitignore } = require('./config');
 
 const HOOK_SCRIPT = `#!/bin/sh
 # Injected by get-lem-ai
@@ -35,6 +35,8 @@ async function install() {
     console.error(chalk.red('❌  Not inside a git repository.'));
     process.exit(1);
   }
+
+  ensureGitignore();
 
   const hooksDir = path.join(repoRoot, '.git', 'hooks');
   const hookPath = path.join(hooksDir, 'reference-transaction');
