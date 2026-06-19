@@ -19,13 +19,18 @@ if [ "$1" = "committed" ]; then
 fi
 `;
 
+const COMMIT_MSG_HOOK_SCRIPT = `#!/bin/sh
+# Injected by get-lem-ai
+get-lem-ai commit-msg "$1"
+`;
+
 async function install() {
   const { loadConfig } = require('./config');
   const { setup } = require('./setup');
   const config = loadConfig();
 
-  // If config is missing or the new apiKey field is missing, force setup
-  if (!config || !config.apiKey) {
+  // If config is missing or the apiKey field is missing, force setup
+  if (!config || !config.apiKey || !config.outputDir) {
     console.log(chalk.yellow('⚠️   Configuration missing or outdated. Starting setup...'));
     await setup();
   }
@@ -40,6 +45,7 @@ async function install() {
 
   const hooksDir = path.join(repoRoot, '.git', 'hooks');
   const hookPath = path.join(hooksDir, 'reference-transaction');
+  const commitHookPath = path.join(hooksDir, 'commit-msg');
 
   // Clean up ALL legacy hooks
   const oldHooks = ['post-checkout', 'reference-transaction'];
@@ -62,11 +68,20 @@ async function install() {
 
   if (fs.existsSync(hookPath)) {
     fs.copyFileSync(hookPath, hookPath + '.backup');
-    console.log(chalk.yellow('⚠️   Existing hook backed up'));
+    console.log(chalk.yellow('⚠️   Existing ref-transaction hook backed up'));
   }
 
   fs.writeFileSync(hookPath, HOOK_SCRIPT, { mode: 0o755 });
   console.log(chalk.green(`\n✅  Ref-Transaction Hook installed/updated → ${hookPath}`));
+
+  if (fs.existsSync(commitHookPath)) {
+    fs.copyFileSync(commitHookPath, commitHookPath + '.backup');
+    console.log(chalk.yellow('⚠️   Existing commit-msg hook backed up'));
+  }
+
+  fs.writeFileSync(commitHookPath, COMMIT_MSG_HOOK_SCRIPT, { mode: 0o755 });
+  console.log(chalk.green(`✅  Commit-Msg Hook installed/updated → ${commitHookPath}`));
+
   console.log(chalk.cyan('🎉  This will now trigger on ANY branch creation method:'));
   console.log(chalk.gray('    - git branch <name>'));
   console.log(chalk.gray('    - git checkout -b <name>'));
@@ -81,17 +96,30 @@ function uninstall() {
   }
 
   const hookPath = path.join(repoRoot, '.git', 'hooks', 'reference-transaction');
+  const commitHookPath = path.join(repoRoot, '.git', 'hooks', 'commit-msg');
 
   if (fs.existsSync(hookPath)) {
     const content = fs.readFileSync(hookPath, 'utf-8');
     if (content.includes('lem-ai') || content.includes('getlem') || content.includes('lem') || content.includes('git-jira-hook')) {
       fs.unlinkSync(hookPath);
-      console.log(chalk.green('\n✅  get-lem-ai Git Hook uninstalled successfully.\n'));
+      console.log(chalk.green('\n✅  get-lem-ai Ref-Transaction Git Hook uninstalled successfully.'));
     } else {
-      console.log(chalk.yellow('\n⚠️   Hook at this path was not created by get-lem-ai. Skipping.\n'));
+      console.log(chalk.yellow('\n⚠️   Ref-Transaction Hook at this path was not created by get-lem-ai. Skipping.'));
     }
   } else {
-    console.log(chalk.gray('\nℹ️   No get-lem-ai hook found to uninstall.\n'));
+    console.log(chalk.gray('\nℹ️   No get-lem-ai ref-transaction hook found to uninstall.'));
+  }
+
+  if (fs.existsSync(commitHookPath)) {
+    const content = fs.readFileSync(commitHookPath, 'utf-8');
+    if (content.includes('get-lem-ai') || content.includes('lem')) {
+      fs.unlinkSync(commitHookPath);
+      console.log(chalk.green('✅  get-lem-ai Commit-Msg Git Hook uninstalled successfully.\n'));
+    } else {
+      console.log(chalk.yellow('⚠️   Commit-Msg Hook at this path was not created by get-lem-ai. Skipping.\n'));
+    }
+  } else {
+    console.log(chalk.gray('ℹ️   No get-lem-ai commit-msg hook found to uninstall.\n'));
   }
 
   // Also remove the project-level config file if it exists

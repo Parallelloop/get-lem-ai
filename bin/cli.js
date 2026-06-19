@@ -5,6 +5,7 @@ const { program } = require('commander');
 const { setup } = require('../src/setup');
 const { install, uninstall } = require('../src/install');
 const { checkout } = require('../src/checkout');
+const { commitMsg } = require('../src/commit');
 
 program
   .name('get-lem-ai')
@@ -15,5 +16,6 @@ program.command('setup').description('Configure webhook URL').action(setup);
 program.command('install').description('Install git hook into current repo').action(install);
 program.command('uninstall').description('Remove git hook from current repo').action(uninstall);
 program.command('checkout <branchName>').description('Internal: called by git hook').action(checkout);
+program.command('commit-msg <msgFilePath>').description('Internal: called by commit-msg hook').action(commitMsg);
 
 program.parse(process.argv);

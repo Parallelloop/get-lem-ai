@@ -11,15 +11,28 @@ function findGitRoot(dir) {
 
 function getConfigPath() {
   const repoRoot = findGitRoot(process.cwd());
-  if (!repoRoot) return null;
-  return path.join(repoRoot, '.lem-ai.json');
+  if (repoRoot) return path.join(repoRoot, '.lem-ai.json');
+  // Fallback: save globally in home directory when not inside a git repo
+  return path.join(require('os').homedir(), '.lem-ai.json');
 }
 
 function loadConfig() {
-  const configPath = getConfigPath();
-  if (!configPath || !fs.existsSync(configPath)) return null;
-  try { return JSON.parse(fs.readFileSync(configPath, 'utf-8')); }
-  catch { return null; }
+  // Try the git repo config first
+  const repoRoot = findGitRoot(process.cwd());
+  if (repoRoot) {
+    const repoConfigPath = path.join(repoRoot, '.lem-ai.json');
+    if (fs.existsSync(repoConfigPath)) {
+      try { return JSON.parse(fs.readFileSync(repoConfigPath, 'utf-8')); }
+      catch { return null; }
+    }
+  }
+  // Fallback: try global home directory config
+  const homeConfigPath = path.join(require('os').homedir(), '.lem-ai.json');
+  if (fs.existsSync(homeConfigPath)) {
+    try { return JSON.parse(fs.readFileSync(homeConfigPath, 'utf-8')); }
+    catch { return null; }
+  }
+  return null;
 }
 
 function ensureGitignore() {
@@ -40,11 +53,11 @@ function ensureGitignore() {
 
 function saveConfig(data) {
   const configPath = getConfigPath();
-  if (!configPath) {
-    throw new Error('Not inside a git repository. Cannot save project-level config.');
-  }
+  // configPath is always set now (falls back to home dir)
   fs.writeFileSync(configPath, JSON.stringify(data, null, 2), 'utf-8');
-  ensureGitignore();
+  // Only add to .gitignore when inside a git repo
+  const repoRoot = findGitRoot(process.cwd());
+  if (repoRoot) ensureGitignore();
 }
 
 const WEBHOOK_URL = 'https://api.getlem.ai/api/v1/webhooks/lem';
