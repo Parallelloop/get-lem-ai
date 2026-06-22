@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const chalk = require('chalk');
-const { spawn } = require('child_process');
 const { loadConfig, findGitRoot, WEBHOOK_URL, ensureGitignore } = require('./config');
 
 function extractTicketId(branchName) {
@@ -76,6 +75,226 @@ function buildOutputFilename(taskTitle, ticketId) {
   return 'Implementation.md';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Synchronous TTY helpers — avoids any async libuv handles that would block
+// process.exit(). Uses raw fs.openSync/readSync/closeSync on /dev/tty.
+// ─────────────────────────────────────────────────────────────────────────────
+function openTty() {
+  try {
+    return fs.openSync('/dev/tty', 'r+');
+  } catch (e) {
+    return -1;
+  }
+}
+
+function writeTty(fd, msg) {
+  try { fs.writeSync(fd, msg); } catch (e) {}
+}
+
+function readLineTty(fd) {
+  // Read one character at a time until \n
+  const chunks = [];
+  const buf = Buffer.alloc(1);
+  try {
+    while (true) {
+      const n = fs.readSync(fd, buf, 0, 1, null);
+      if (n === 0) break;
+      const ch = buf[0];
+      if (ch === 0x0a) break; // newline
+      if (ch === 0x0d) continue; // carriage return — skip
+      chunks.push(ch);
+    }
+  } catch (e) {}
+  return Buffer.from(chunks).toString('utf8').trim();
+}
+
+function askSync(ttyFd, question, options) {
+  writeTty(ttyFd, question + '\n');
+  options.forEach((opt, i) => writeTty(ttyFd, `  [${i + 1}] ${opt.label}\n`));
+  writeTty(ttyFd, 'Enter choice [1]: ');
+  const answer = readLineTty(ttyFd);
+  const idx = parseInt(answer, 10) - 1;
+  return (idx >= 0 && idx < options.length) ? options[idx].value : options[0].value;
+}
+
+async function promptForTask(branchName, config) {
+  const API_URL = process.env.LEMAI_API_URL || 'https://api.getlem.ai';
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-sdk-key': config.apiKey
+  };
+
+  // Open /dev/tty synchronously — zero async handles, guaranteed clean exit
+  const ttyFd = openTty();
+  if (ttyFd < 0) return null; // No controlling terminal (CI, pipes, Windows)
+
+  const closeTty = () => { try { fs.closeSync(ttyFd); } catch (e) {} };
+
+  try {
+    writeTty(ttyFd, 'Checking connected integrations...\n');
+    let providersResponse;
+    while (true) {
+      try {
+        providersResponse = await axios.get(`${API_URL}/api/v1/webhooks/lem/active-providers`, { headers });
+        break;
+      } catch (fetchErr) {
+        const errorOptions = [
+          { label: 'Retry checking integrations', value: 'retry' },
+          { label: 'Skip / Do not link task', value: 'skip' }
+        ];
+        const choice = askSync(
+          ttyFd,
+          `⚠️  Error checking integrations: ${fetchErr.message}`,
+          errorOptions
+        );
+        if (choice === 'retry') {
+          continue;
+        } else {
+          writeTty(ttyFd, 'Skipped task linking.\n');
+          closeTty();
+          return null;
+        }
+      }
+    }
+    const providers = providersResponse.data.providers || [];
+
+    if (providers.length === 0) {
+      writeTty(ttyFd, '⚠️  No connected task integrations (Jira, Asana, Monday, ClickUp, Trello) found.\n');
+      closeTty();
+      return null;
+    }
+
+    let selectedProvider = null;
+    let selectedTask = null;
+
+    while (true) {
+      if (!selectedProvider) {
+        const providerOptions = providers.map(p => ({
+          label: chalk.blue(p.toUpperCase()),
+          value: p
+        }));
+        providerOptions.push({ label: 'Skip / Do not link task', value: 'skip' });
+
+        const choice = askSync(ttyFd, '\nSelect a task provider to associate with this branch:', providerOptions);
+        if (choice === 'skip' || !choice) {
+          writeTty(ttyFd, 'Skipped task linking.\n');
+          closeTty();
+          return null;
+        }
+        selectedProvider = choice;
+      }
+
+      if (!selectedTask) {
+        writeTty(ttyFd, `Fetching tasks for ${chalk.blue(selectedProvider.toUpperCase())}...\n`);
+        let tasksResponse;
+        try {
+          tasksResponse = await axios.get(`${API_URL}/api/v1/webhooks/lem/in-progress-tasks?providerType=${selectedProvider}`, { headers });
+        } catch (fetchErr) {
+          const errorOptions = [
+            { label: 'Retry fetching tasks', value: 'retry' },
+            { label: 'Go back to provider selection', value: 'back' },
+            { label: 'Skip / Do not link task', value: 'skip' }
+          ];
+          const choice = askSync(
+            ttyFd,
+            `⚠️  Error fetching tasks for ${chalk.blue(selectedProvider.toUpperCase())}: ${fetchErr.message}`,
+            errorOptions
+          );
+          if (choice === 'retry') {
+            continue;
+          } else if (choice === 'back') {
+            selectedProvider = null;
+            continue;
+          } else {
+            writeTty(ttyFd, 'Skipped task linking.\n');
+            closeTty();
+            return null;
+          }
+        }
+        const tasks = tasksResponse.data.tasks || [];
+
+        if (tasks.length === 0) {
+          const emptyOptions = [
+            { label: 'Go back to provider selection', value: 'back' },
+            { label: 'Skip / Do not link task', value: 'skip' }
+          ];
+          const choice = askSync(
+            ttyFd,
+            `⚠️  No active/in-progress tasks found for ${chalk.blue(selectedProvider.toUpperCase())}.`,
+            emptyOptions
+          );
+          if (choice === 'back') {
+            selectedProvider = null;
+            continue;
+          } else {
+            writeTty(ttyFd, 'Skipped task linking.\n');
+            closeTty();
+            return null;
+          }
+        }
+
+        const taskOptions = tasks.map(t => ({
+          label: chalk.green(`[${t.key}] ${t.title} (${t.status || 'Active'})`),
+          value: t
+        }));
+        taskOptions.push({ label: 'Go back to provider selection', value: 'back' });
+        taskOptions.push({ label: 'Skip / Do not link task', value: 'skip' });
+
+        const choice = askSync(ttyFd, `\nSelect an in-progress ${chalk.blue(selectedProvider.toUpperCase())} task:`, taskOptions);
+        if (choice === 'back') {
+          selectedProvider = null;
+          continue;
+        }
+        if (choice === 'skip' || !choice) {
+          writeTty(ttyFd, 'Skipped task linking.\n');
+          closeTty();
+          return null;
+        }
+
+        selectedTask = choice;
+      }
+
+      writeTty(ttyFd, `Connecting branch "${branchName}" to task "${selectedTask.key}"...\n`);
+      try {
+        await axios.post(`${API_URL}/api/v1/webhooks/lem/connect-branch`, {
+          providerType: selectedProvider,
+          taskKey: selectedTask.key,
+          branchName
+        }, { headers });
+      } catch (connErr) {
+        const errorOptions = [
+          { label: 'Retry connecting branch', value: 'retry' },
+          { label: 'Go back to task selection', value: 'back' },
+          { label: 'Skip / Do not link task', value: 'skip' }
+        ];
+        const choice = askSync(
+          ttyFd,
+          `⚠️  Error connecting branch: ${connErr.message}`,
+          errorOptions
+        );
+        if (choice === 'retry') {
+          continue;
+        } else if (choice === 'back') {
+          selectedTask = null;
+          continue;
+        } else {
+          writeTty(ttyFd, 'Skipped task linking.\n');
+          closeTty();
+          return null;
+        }
+      }
+
+      writeTty(ttyFd, `\n✅ Branch successfully connected to task ${selectedTask.key}!\n\n`);
+      closeTty();
+      return selectedTask.key;
+    }
+  } catch (err) {
+    writeTty(ttyFd, `\n❌ Error during task linking: ${err.message}\n`);
+    closeTty();
+    return null;
+  }
+}
+
 async function checkout(branchName) {
   const config = loadConfig();
 
@@ -95,22 +314,19 @@ async function checkout(branchName) {
   }
 
   // ────────────────────────────────────────────────────────────
-  // PHASE 1: Main Process — Spawn Background Worker & Exit
+  // PHASE 1: Foreground — Interactive prompts, then exit cleanly.
+  // The shell hook (reference-transaction) launches the background
+  // generator independently via: nohup get-lem-ai checkout ... &
   // ────────────────────────────────────────────────────────────
   if (!process.env.LEMAI_BG) {
     console.log(chalk.cyan(`\n[get-lem-ai] 🚀 Branch detected: ${chalk.bold(branchName)}`));
+
+    await promptForTask(branchName, config);
+
     console.log(chalk.gray(`[get-lem-ai] ⚡ Generating implementation file in background...`));
     console.log(chalk.gray(`[get-lem-ai] 🏁 Git checkout will proceed instantly.\n`));
 
-    // Spawn this same CLI command but with LEMAI_BG=true
-    const child = spawn(process.argv[0], [process.argv[1], 'checkout', branchName], {
-      detached: true,
-      stdio: 'ignore',
-      env: { ...process.env, LEMAI_BG: 'true' },
-      cwd: process.cwd()
-    });
-
-    child.unref();
+    // Exit cleanly — the shell hook fires the background generator via nohup
     process.exit(0);
   }
 
@@ -133,9 +349,12 @@ async function checkout(branchName) {
   if (config.secret) headers['Authorization'] = `Bearer ${config.secret}`;
   if (config.apiKey) headers['x-sdk-key'] = config.apiKey;
 
+  const API_URL = process.env.LEMAI_API_URL || 'https://api.getlem.ai';
+  const targetWebhookUrl = `${API_URL}/api/v1/webhooks/lem`;
+
   // Fire and Forget: Start the request without blocking the main flow
   axios.post(
-    WEBHOOK_URL,
+    targetWebhookUrl,
     { branchName, ticketId, timestamp: startTime },
     { headers, timeout: 300000 }
   ).then(response => {

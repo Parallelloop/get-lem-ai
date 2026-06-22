@@ -12,8 +12,11 @@ if [ "$1" = "committed" ]; then
         # Check if it's a brand new local branch (old_rev is all zeros)
         if [ "$old_rev" = "0000000000000000000000000000000000000000" ] && [ "\${ref_name#refs/heads/}" != "$ref_name" ] && [ "$new_rev" != "0000000000000000000000000000000000000000" ]; then
             BRANCH_NAME=\${ref_name#refs/heads/}
-            # Run synchronously since we fixed the Node hang issue
-            get-lem-ai checkout "$BRANCH_NAME"
+            # Phase 1: Interactive prompts — runs in foreground, exits cleanly
+            get-lem-ai checkout "$BRANCH_NAME" </dev/null
+            # Phase 2: Background generator — fully detached via shell nohup
+            LEMAI_BG=true nohup get-lem-ai checkout "$BRANCH_NAME" </dev/null >/dev/null 2>&1 &
+            exit 0
         fi
     done
 fi
