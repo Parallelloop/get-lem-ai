@@ -28,10 +28,10 @@ async function commitMsg(msgFilePath) {
     process.exit(0);
   }
 
-  if (cleanMsg.length < 150) {
+  if (cleanMsg.length < 75) {
     console.log(chalk.red('\n❌ Commit message is too short!'));
     console.log(chalk.yellow(`📝 Current length: ${cleanMsg.length} characters.`));
-    console.log(chalk.red('Please update the commit message to be of 150 characters.\n'));
+    console.log(chalk.red('Please update the commit message to be of 75 characters.\n'));
     process.exit(1);
   }
 
