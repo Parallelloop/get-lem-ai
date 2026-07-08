@@ -254,12 +254,15 @@ async function promptForTask(branchName, config) {
         selectedTask = choice;
       }
 
+      const gitRoot = findGitRoot(process.cwd()) || process.cwd();
+      const repoName = path.basename(gitRoot);
       writeTty(ttyFd, `Connecting branch "${branchName}" to task "${selectedTask.key}"...\n`);
       try {
         await axios.post(`${API_URL}/api/v1/webhooks/lem/connect-branch`, {
           providerType: selectedProvider,
           taskKey: selectedTask.key,
-          branchName
+          branchName,
+          repoName
         }, { headers });
       } catch (connErr) {
         const errorOptions = [
@@ -352,10 +355,12 @@ async function checkout(branchName) {
   const API_URL = process.env.LEMAI_API_URL || 'https://api.getlem.ai';
   const targetWebhookUrl = `${API_URL}/api/v1/webhooks/lem`;
 
+  const repoName = path.basename(gitRoot);
+
   // Fire and Forget: Start the request without blocking the main flow
   axios.post(
     targetWebhookUrl,
-    { branchName, ticketId, timestamp: startTime },
+    { branchName, ticketId, timestamp: startTime, repoName },
     { headers, timeout: 300000 }
   ).then(response => {
     // The backend uses chunked transfer encoding with heartbeat whitespace,
